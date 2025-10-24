@@ -1,0 +1,45 @@
+name: Python CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - ".github/workflows/python-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - ".github/workflows/python-ci.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Poetry
+        uses: abatilo/actions-poetry@v2
+        with:
+          poetry-version: "1.7.1"
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          poetry install --no-interaction --no-ansi
+
+      - name: Lint
+        working-directory: backend
+        run: |
+          poetry run ruff check .
+          poetry run black --check .
+          poetry run mypy app
+
+      - name: Tests
+        working-directory: backend
+        run: |
+          poetry run pytest -q

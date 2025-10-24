@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Docker: Up",
+      "type": "shell",
+      "command": "make up"
+    },
+    {
+      "label": "Docker: Down",
+      "type": "shell",
+      "command": "make down"
+    },
+    {
+      "label": "API: Dev",
+      "type": "shell",
+      "command": "make api",
+      "problemMatcher": []
+    },
+    {
+      "label": "Web: Dev",
+      "type": "shell",
+      "command": "make web",
+      "problemMatcher": []
+    },
+    {
+      "label": "Tests: API",
+      "type": "shell",
+      "command": "cd backend && pytest -q"
+    },
+    {
+      "label": "Tests: Web",
+      "type": "shell",
+      "command": "cd frontend && npm test"
+    }
+  ]
+}

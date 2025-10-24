@@ -1,0 +1,40 @@
+name: Node CI
+
+on:
+  push:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/node-ci.yml"
+  pull_request:
+    paths:
+      - "frontend/**"
+      - ".github/workflows/node-ci.yml"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Lint
+        working-directory: frontend
+        run: npm run lint
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run build -- --mode development
+
+      - name: Tests
+        working-directory: frontend
+        run: npm test -- --run

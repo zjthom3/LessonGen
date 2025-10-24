@@ -1,0 +1,74 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:15
+    container_name: lessongen-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: lessongen
+      POSTGRES_USER: lessongen
+      POSTGRES_PASSWORD: lessongen
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: lessongen-api
+    restart: unless-stopped
+    env_file:
+      - .env.sample
+    environment:
+      DATABASE_URL: postgresql+psycopg2://lessongen:lessongen@db:5432/lessongen
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: lessongen-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+
+  pgadmin:
+    image: dpage/pgadmin4:7.5
+    container_name: lessongen-pgadmin
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@lessongen.local
+      PGADMIN_DEFAULT_PASSWORD: lessongen
+    depends_on:
+      - db
+    ports:
+      - "8080:80"
+
+  minio:
+    image: quay.io/minio/minio:RELEASE.2024-02-17T01-15-57Z
+    container_name: lessongen-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:
