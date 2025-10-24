@@ -21,7 +21,7 @@ services:
     container_name: lessongen-api
     restart: unless-stopped
     env_file:
-      - .env.sample
+      - .env
     environment:
       DATABASE_URL: postgresql+psycopg2://lessongen:lessongen@db:5432/lessongen
     depends_on:

@@ -1,33 +1,60 @@
-"""Security utilities for JWT token management."""
+"""Authentication and authorization helpers."""
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict
+import uuid
+from typing import Callable
 
-from jose import JWTError, jwt
+from fastapi import Depends, HTTPException, Request, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session, selectinload
 
-from .config import settings
-
-
-class TokenError(RuntimeError):
-    """Raised when a JWT token cannot be decoded or validated."""
-
-
-def create_access_token(subject: str | Any, expires_delta: timedelta | None = None) -> str:
-    """Create a signed JWT access token."""
-
-    to_encode: Dict[str, Any] = {"sub": str(subject)}
-    expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=settings.access_token_expire_minutes)
-    )
-    to_encode["exp"] = expire
-    return jwt.encode(to_encode, settings.secret_key, algorithm=settings.jwt_algorithm)
+from app.db.session import get_session
+from app.models.user import User
 
 
-def decode_token(token: str) -> Dict[str, Any]:
-    """Decode a JWT token and return its payload."""
+def _extract_user_id(request: Request) -> uuid.UUID:
+    """Read the authenticated user id from the session cookie."""
 
+    raw_user_id = request.session.get("user_id")
+    if not raw_user_id:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-    except JWTError as exc:  # pragma: no cover - defensive branch
-        raise TokenError("Could not validate credentials") from exc
+        return uuid.UUID(str(raw_user_id))
+    except ValueError as exc:  # pragma: no cover - defensive
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid session") from exc
+
+
+def get_current_user(
+    request: Request,
+    db: Session = Depends(get_session),
+) -> User:
+    """Return the currently authenticated user."""
+
+    user_id = _extract_user_id(request)
+    stmt = select(User).options(selectinload(User.roles)).where(User.id == user_id)
+    user = db.execute(stmt).scalars().first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is inactive")
+    return user
+
+
+def get_current_active_user(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """Ensure the current user is active."""
+
+    if not current_user.is_active:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is disabled")
+    return current_user
+
+
+def require_admin(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    """Ensure the current user has administrative rights."""
+
+    if current_user.is_superuser or current_user.has_role("admin"):
+        return current_user
+    raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")

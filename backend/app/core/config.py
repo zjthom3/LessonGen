@@ -1,10 +1,11 @@
 """Application configuration settings."""
 from __future__ import annotations
 
+import json
 from functools import lru_cache
-from typing import List
+from typing import List, Sequence
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -33,10 +34,67 @@ class Settings(BaseSettings):
         env="BACKEND_CORS_ORIGINS",
     )
 
+    frontend_app_url: AnyHttpUrl | str = Field(
+        default="http://localhost:5173", env="FRONTEND_APP_URL"
+    )
+
+    session_cookie_name: str = Field(default="lessongen_session", env="SESSION_COOKIE_NAME")
+    session_cookie_max_age_seconds: int = Field(
+        default=60 * 60 * 24 * 7, env="SESSION_COOKIE_MAX_AGE_SECONDS"
+    )
+
+    google_client_id: str = Field(default="GOOGLE_CLIENT_ID_PLACEHOLDER", env="GOOGLE_CLIENT_ID")
+    google_client_secret: str = Field(
+        default="GOOGLE_CLIENT_SECRET_PLACEHOLDER", env="GOOGLE_CLIENT_SECRET"
+    )
+    google_redirect_uri: str = Field(
+        default="http://localhost:8000/auth/callback", env="GOOGLE_REDIRECT_URI"
+    )
+    google_allowed_domains: List[str] = Field(default_factory=list, env="GOOGLE_ALLOWED_DOMAINS")
+
+    default_tenant_name: str = Field(default="Demo District", env="DEFAULT_TENANT_NAME")
+
+    openai_api_key: str = Field(default="", env="OPENAI_API_KEY")
+    openai_model: str = Field(default="gpt-4o-mini", env="OPENAI_MODEL")
+    generation_prompt_template: str = Field(
+        default="app/ai/prompts/lesson_v1.md", env="GENERATION_PROMPT_TEMPLATE"
+    )
+
     class Config:
         case_sensitive = False
         env_file = ".env"
         env_file_encoding = "utf-8"
+
+    @field_validator("backend_cors_origins", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, value: object) -> Sequence[str] | object:
+        """Allow comma-separated strings for CORS origins."""
+
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
+
+    @field_validator("google_allowed_domains", mode="before")
+    @classmethod
+    def parse_allowed_domains(cls, value: object) -> Sequence[str] | object:
+        """Normalize allowed domain list from env strings."""
+
+        if isinstance(value, str):
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+            cleaned = [entry.strip() for entry in value.split(",") if entry.strip()]
+            return cleaned
+        return value
 
 
 @lru_cache(maxsize=1)

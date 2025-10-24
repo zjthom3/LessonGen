@@ -14,6 +14,9 @@ RUN poetry config virtualenvs.create false \
     && poetry install --no-interaction --no-ansi
 
 COPY app /app/app
+COPY migrations /app/migrations
+COPY alembic.ini /app/
+COPY tests /app/tests
 
 EXPOSE 8000
 
